@@ -1,0 +1,39 @@
+# Stage 2 API 配置文件
+# 用于调用 LLM API 将优化后纯文本适配回 LaTeX
+
+api:
+  # API 类型: "anthropic" 或 "openai"
+  provider: "openai"
+
+  # API 地址
+  anthropic:
+    base_url: "https://api.deepseek.com/anthropic/v1/messages"
+    api_key: "YOUR_API_KEY_HERE"
+
+  openai:
+    base_url: "https://api.deepseek.com/v1/chat/completions"
+    api_key: "YOUR_API_KEY_HERE"
+
+  # 模型与参数
+  model: "deepseek-v4-pro"
+  temperature: 0.3        # 适中温度，兼顾稳定与多样性
+  max_tokens: 8192
+
+# 重试策略
+retry:
+  max_retries: 3          # 每段最多重试次数
+  temperature_delta: 0.1  # 每次重试升温增量
+
+# 验证
+validation:
+  # 段落数检查：空行也算一行
+  # 例: "par1\n\npar2\n\npar3" → 5 行（3段 + 2空行分隔）
+  check_paragraph_count: true
+  check_latex_braces: true       # \begin{...} 与 \end{...} 配对
+  check_cite_preserved: true     # \cite 引用是否保留
+  check_ref_preserved: true      # \ref 引用是否保留
+  check_content_changed: true    # 适配后文本是否确实改变了措辞
+
+# 输出
+output:
+  jobid: "default"

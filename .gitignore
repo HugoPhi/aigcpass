@@ -1,0 +1,12 @@
+# API keys
+config/api.yaml
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Job data (user-specific)
+jobs/
