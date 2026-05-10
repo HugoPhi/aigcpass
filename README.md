@@ -2,7 +2,18 @@
 
 对 AIGC 检测系统（维普/知网等）导出的 HTML 统计报告进行自动分析：提取疑似 AIGC 片段、在 LaTeX 源文件中插入定位标记、将降重后的文本还原到 LaTeX。
 
+这个项目的目的在于能够帮你省下降AIGC网站的一些经费（由于他们很多按字数收费），以及省下你大量的手工对比和修改时间，你需要做的就是好好审查，然后做微量的修改。
+
+
+> [!WARNING]
+> - 宇宙级免责声明：最终效果完全取决于你最开始的论文好坏以及你使用的降重软件，本项目只是帮助你节省一些手动的时间，当然你也完全可以当老资历去手搓。
+> - 目前仅支持Mac/Linux平台，Windows我没试过
+> - 你所有需要降重的内容都需要被包含在main.tex，如果你有分小节的书写LaTeX习惯，恭喜你你用不了（doge
+> - 希望能帮到大家，祝你们都能顺利过检！Let's goooooo~
+
 ## 快速开始
+
+首先，安装[icdiff](https://github.com/jeffkaufman/icdiff.git)。
 
 ```bash
 # 1. 创建 job 并放入文件
@@ -12,7 +23,7 @@ python3 aigcpass.py init --jobid mypaper
 # 2. Stage 1：提取标记（在 Claude Code 中说，或在终端运行）
 python3 aigcpass.py stage1 --jobid mypaper
 #    → 解析 HTML 紫色标记 → 在 main.tex 中插入 % AIGC_BEGIN_{N} / % AIGC_END_{N}
-#    → 输出 input_fragments.txt（送降重）
+#    → 输出 input_fragments.txt（送降重，推荐：https://kuaipaper.com/）
 
 # 3. 降重后，Stage 2：还原到 LaTeX
 #    先把降重结果保存为 report/AIGC片段优化.txt，然后：
