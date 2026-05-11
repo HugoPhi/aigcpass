@@ -25,6 +25,9 @@ def _find_root():
 ROOT = _find_root()
 console = Console()
 
+# Import multi-provider API dispatcher
+from providers import call_api
+
 # ─── config ──────────────────────────────────────────────────────────
 def load_config(path):
     import yaml
@@ -81,39 +84,6 @@ def adapt_diff_rate(original_latex, adapted_latex, purple_text):
     if not stripped or not purple_text:
         return 0.0
     return 1.0 - difflib.SequenceMatcher(None, purple_text, stripped).ratio()
-
-# ─── API call ───────────────────────────────────────────────────────
-def call_api(cfg, system_prompt, user_prompt, temperature=None):
-    temp = temperature if temperature is not None else cfg["api"]["temperature"]
-    provider = cfg["api"]["provider"]
-    key = cfg["api"][provider]["api_key"]
-    url = cfg["api"][provider]["base_url"]
-    model = cfg["api"]["model"]
-    max_tok = cfg["api"]["max_tokens"]
-
-    body = {"model": model, "max_tokens": max_tok, "temperature": temp}
-    if provider == "anthropic":
-        body["system"] = system_prompt
-        body["messages"] = [{"role": "user", "content": user_prompt}]
-        headers = {"Content-Type": "application/json", "x-api-key": key,
-                   "anthropic-version": "2023-06-01"}
-    else:
-        body["messages"] = [{"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}]
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
-
-    req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers)
-
-    for delay in [1, 2, 4, 8, 16]:
-        try:
-            resp = urllib.request.urlopen(req, timeout=300)
-            data = json.loads(resp.read())
-            return data["content"][0]["text"] if provider == "anthropic" else data["choices"][0]["message"]["content"]
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                time.sleep(delay); continue
-            raise
-    raise RuntimeError("429 retries exhausted")
 
 # ─── validation ─────────────────────────────────────────────────────
 def validate(original, adapted, cfg, purple_text, optimized_text):

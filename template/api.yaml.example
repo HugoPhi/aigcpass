@@ -1,20 +1,26 @@
 # Stage 2 API 配置文件
 # 用于调用 LLM API 将优化后纯文本适配回 LaTeX
+#
+# 支持厂商: deepseek, kimi, qwen, glm, openai, claude, gemini
+# 以及任何兼容 OpenAI Chat Completions 格式的自定义平台
 
 api:
-  # API 类型: "anthropic" 或 "openai"
-  provider: "openai"
+  # 厂商标识 (从 setup.py 向导中选择)
+  provider: "deepseek"
 
-  # API 地址
-  anthropic:
-    base_url: "https://api.deepseek.com/anthropic/v1/messages"
-    api_key: "YOUR_API_KEY_HERE"
+  # 适配器类型: openai | anthropic | gemini
+  #   - openai:  绝大多数国产及国外平台 (DeepSeek, Kimi, Qwen, GLM, OpenAI)
+  #   - anthropic: Anthropic Claude 原生 API
+  #   - gemini:    Google Gemini 原生 API
+  type: "openai"
 
-  openai:
-    base_url: "https://api.deepseek.com/v1/chat/completions"
-    api_key: "YOUR_API_KEY_HERE"
+  # API 端点 (setup.py 会根据厂商自动填充默认值)
+  base_url: "https://api.deepseek.com/v1/chat/completions"
 
-  # 模型与参数
+  # API 密钥
+  api_key: "YOUR_API_KEY_HERE"
+
+  # 模型与生成参数
   model: "deepseek-v4-pro"
   temperature: 0.3        # 适中温度，兼顾稳定与多样性
   max_tokens: 8192
@@ -33,7 +39,3 @@ validation:
   check_cite_preserved: true     # \cite 引用是否保留
   check_ref_preserved: true      # \ref 引用是否保留
   check_content_changed: true    # 适配后文本是否确实改变了措辞
-
-# 输出
-output:
-  jobid: "default"

@@ -33,6 +33,8 @@ python3 script/extract_aigc.py --jobid mypaper
 
 调用 LLM API 逐段将优化文本适配回 LaTeX，带并发、实时面板、自动验证和重试。
 
+支持多厂商：DeepSeek、Kimi、Qwen、GLM、OpenAI、Claude、Gemini 及任何兼容 OpenAI 格式的自定义平台。
+
 | 参数 | 说明 |
 |------|------|
 | `--jobid JOBID` | Job ID（默认 `default`） |

@@ -4,7 +4,7 @@
 Guides the user through:
   1. Creating/finding a job directory
   2. Verifying main.tex and HTML report are in place
-  3. Setting up per-job api.yaml from template
+  3. Selecting an LLM provider and configuring api.yaml
   4. Checking all prerequisites for Stage 1 and Stage 2
 
 Usage:
@@ -22,15 +22,26 @@ def _find_root():
     return d if d != "/" else _os.getcwd()
 
 ROOT = _find_root()
-SKILL = ROOT  # template/ is at project root now
+SKILL = ROOT
 
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
 from rich.table import Table
 from rich import print as rprint
+from rich.prompt import Prompt, Confirm, IntPrompt
 
 console = Console()
+
+# Try to import questionary for better UX; fall back to rich prompts
+try:
+    import questionary
+    _HAS_QUESTIONARY = True
+except ImportError:
+    _HAS_QUESTIONARY = False
+
+# Import provider registry
+sys.path.insert(0, os.path.join(ROOT, "script"))
+from providers import PROVIDERS, list_providers, get_provider
 
 
 def banner():
@@ -126,48 +137,203 @@ def step_files(jobid):
     return all_ok
 
 
+# ─── Provider Selection Helper ──────────────────────────────────────
+def _select_provider_interactive():
+    """Let user select a provider from the registry. Returns provider key."""
+    keys = list_providers()
+
+    if _HAS_QUESTIONARY:
+        choices = [
+            questionary.Choice(
+                title=f"{p['name']:24s}  [{p['type']:10s}]  推荐: {p['models'][0]}",
+                value=k,
+            )
+            for k in keys
+        ]
+        choices.append(questionary.Separator())
+        choices.append(questionary.Choice("自定义 / Other", value="custom"))
+
+        selected = questionary.select(
+            "请选择 LLM 服务商:",
+            choices=choices,
+            use_arrow_keys=True,
+            instruction="\n  使用 ↑↓ 选择，回车确认",
+        ).ask()
+    else:
+        console.print("\n[bold]可选服务商:[/]")
+        table = Table(show_header=True, header_style="bold cyan", box=None)
+        table.add_column("编号", width=4, justify="right")
+        table.add_column("服务商", width=22)
+        table.add_column("协议", width=10)
+        table.add_column("推荐模型")
+        for i, k in enumerate(keys, 1):
+            p = PROVIDERS[k]
+            table.add_row(str(i), p["name"], p["type"], p["models"][0])
+        table.add_row(str(len(keys)+1), "自定义 / Other", "-", "手动输入")
+        console.print(table)
+
+        idx = IntPrompt.ask("  选择编号", default=1)
+        if 1 <= idx <= len(keys):
+            selected = keys[idx - 1]
+        else:
+            selected = "custom"
+
+    return selected
+
+
+def _select_model_interactive(provider_key, provider_meta):
+    """Let user select or enter a model. Returns model string."""
+    models = provider_meta["models"]
+
+    if _HAS_QUESTIONARY:
+        choices = [questionary.Choice(m, value=m) for m in models]
+        choices.append(questionary.Separator())
+        choices.append(questionary.Choice("其他（手动输入）", value="__custom__"))
+
+        selected = questionary.select(
+            f"请选择 {provider_meta['name']} 的模型:",
+            choices=choices,
+            use_arrow_keys=True,
+        ).ask()
+
+        if selected == "__custom__":
+            selected = questionary.text("输入模型 ID:").ask()
+    else:
+        console.print(f"\n  [bold]{provider_meta['name']} 推荐模型:[/]")
+        for i, m in enumerate(models, 1):
+            console.print(f"    [{i}] {m}")
+        console.print(f"    [{len(models)+1}] 其他（手动输入）")
+
+        idx = IntPrompt.ask("  选择编号", default=1)
+        if 1 <= idx <= len(models):
+            selected = models[idx - 1]
+        else:
+            selected = Prompt.ask("  输入模型 ID", default=models[0])
+
+    return selected
+
+
 # ─── Step 3: API config ─────────────────────────────────────────────
 def step_config(jobid):
     step_header(3, "API 配置")
     jobdir = os.path.join(ROOT, "jobs", jobid)
     api_yaml = os.path.join(jobdir, "api.yaml")
-    template = os.path.join(SKILL, "template", "api.yaml.example")
 
+    # If already configured and valid, offer to keep or reconfigure
+    existing_cfg = None
     if os.path.exists(api_yaml):
-        with open(api_yaml) as f:
-            content = f.read()
-        has_key = "YOUR_API_KEY_HERE" not in content and len(re.findall(r'sk-[a-zA-Z0-9]+', content)) > 0
-        if has_key:
-            check_and_show(True, "api.yaml 已配置")
-            return True
-        else:
-            check_and_show(False, "api.yaml 存在但 API key 未填写")
+        try:
+            import yaml
+            with open(api_yaml) as f:
+                existing_cfg = yaml.safe_load(f.read())
+        except Exception:
+            existing_cfg = None
+
+        if existing_cfg and existing_cfg.get("api", {}).get("api_key"):
+            old_key = existing_cfg["api"].get("provider", "unknown")
+            if Confirm.ask(f"  检测到已配置的 API ({old_key})，是否重新配置?", default=False):
+                pass  # continue to reconfigure
+            else:
+                check_and_show(True, "api.yaml 已配置（保留现有）")
+                return True
+
+    # ── Provider selection ──────────────────────────────────────────
+    selected_provider = _select_provider_interactive()
+
+    if selected_provider == "custom":
+        # Custom provider: ask for everything manually
+        console.print("\n[bold yellow]自定义厂商配置[/]")
+        custom_type = Prompt.ask(
+            "  适配器类型",
+            choices=["openai", "anthropic", "gemini"],
+            default="openai"
+        )
+        custom_name = Prompt.ask("  厂商名称（用于显示）", default="custom")
+        custom_base = Prompt.ask("  API base URL")
+        custom_models = Prompt.ask("  推荐模型（逗号分隔）", default="gpt-4o")
+        custom_models = [m.strip() for m in custom_models.split(",") if m.strip()]
+
+        provider_meta = {
+            "name": custom_name,
+            "type": custom_type,
+            "base_url": custom_base,
+            "models": custom_models,
+            "key_hint": "请从对应平台获取",
+            "docs_url": "",
+        }
+        provider_key = "custom"
     else:
-        check_and_show(False, "api.yaml 不存在")
-        shutil.copy(template, api_yaml)
-        console.print(f"    [green]已从模板创建: {api_yaml}[/]")
+        provider_meta = get_provider(selected_provider)
+        provider_key = selected_provider
 
-    console.print()
-    console.print("    [yellow]请编辑 api.yaml，填入你的 DeepSeek API key：[/]")
-    console.print(f"    [dim]文件位置: {api_yaml}[/]")
-    console.print(f"    [dim]申请地址: https://platform.deepseek.com/[/]")
-    console.print()
-    console.print("    [dim]只需修改 openai.api_key 这一行，其他保持默认即可。[/]")
+    console.print(f"\n[bold]已选择:[/] [cyan]{provider_meta['name']}[/]  ({provider_meta['type']} 协议)")
+    console.print(f"  文档: [dim]{provider_meta['docs_url']}[/]")
 
-    if Confirm.ask("   是否现在打开编辑器？", default=True):
-        editor = os.environ.get("EDITOR", "nano")
-        os.system(f"{editor} {api_yaml}")
+    # ── Model selection ─────────────────────────────────────────────
+    model = _select_model_interactive(provider_key, provider_meta)
+    console.print(f"  模型: [cyan]{model}[/]")
 
-    # Verify after edit
-    if os.path.exists(api_yaml):
-        with open(api_yaml) as f:
-            content = f.read()
-        if "YOUR_API_KEY_HERE" not in content:
-            console.print("    [green]✓ API key 已配置[/]")
-            return True
+    # ── API key ─────────────────────────────────────────────────────
+    console.print(f"\n  [yellow]请从以下地址获取 API key:[/]")
+    console.print(f"    {provider_meta['key_hint']}")
 
-    console.print("    [red]API key 尚未配置，请稍后手动编辑 api.yaml[/]")
-    return False
+    if _HAS_QUESTIONARY:
+        api_key = questionary.password("  输入 API key:").ask()
+    else:
+        api_key = Prompt.ask("  输入 API key", password=True)
+
+    if not api_key or api_key.strip() == "":
+        console.print("    [red]API key 为空，请稍后手动编辑 api.yaml[/]")
+        api_key = "YOUR_API_KEY_HERE"
+
+    # ── Base URL override ───────────────────────────────────────────
+    default_base = provider_meta["base_url"]
+    if _HAS_QUESTIONARY:
+        if questionary.confirm(f"使用默认 endpoint?\n  {default_base}", default=True).ask():
+            base_url = default_base
+        else:
+            base_url = questionary.text("输入自定义 endpoint:", default=default_base).ask()
+    else:
+        if Confirm.ask(f"  使用默认 endpoint? ({default_base})", default=True):
+            base_url = default_base
+        else:
+            base_url = Prompt.ask("  输入自定义 endpoint", default=default_base)
+
+    # ── Parameters ──────────────────────────────────────────────────
+    console.print("\n[bold]生成参数[/]")
+    temp = float(Prompt.ask("  temperature", default="0.3"))
+    max_tok = int(Prompt.ask("  max_tokens", default="8192"))
+
+    # ── Write api.yaml ──────────────────────────────────────────────
+    cfg = {
+        "api": {
+            "provider": provider_key,
+            "type": provider_meta["type"],
+            "base_url": base_url,
+            "api_key": api_key,
+            "model": model,
+            "temperature": temp,
+            "max_tokens": max_tok,
+        },
+        "retry": {
+            "max_retries": 3,
+            "temperature_delta": 0.1,
+        },
+        "validation": {
+            "check_paragraph_count": True,
+            "check_latex_braces": True,
+            "check_cite_preserved": True,
+            "check_ref_preserved": True,
+            "check_content_changed": True,
+        },
+    }
+
+    import yaml
+    with open(api_yaml, "w", encoding="utf-8") as f:
+        yaml.dump(cfg, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+
+    console.print(f"\n  [green]✓ 配置已保存:[/] {api_yaml}")
+    return True
 
 
 # ─── Step 4: summary ────────────────────────────────────────────────
@@ -193,6 +359,19 @@ def step_summary(jobid, files_ok, config_ok):
 
     table.add_row("api.yaml", "✓" if config_ok else "✗",
                   "已配置" if config_ok else "需编辑填入 key")
+
+    # Show provider info if available
+    api_yaml = os.path.join(jobdir, "api.yaml")
+    if os.path.exists(api_yaml):
+        try:
+            import yaml
+            with open(api_yaml) as f:
+                cfg = yaml.safe_load(f.read())
+            prov = cfg.get("api", {}).get("provider", "-")
+            model = cfg.get("api", {}).get("model", "-")
+            table.add_row("服务商", "", f"{prov} / {model}")
+        except Exception:
+            pass
 
     # Check if stage1 done
     markers = 0
