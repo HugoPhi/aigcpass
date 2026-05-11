@@ -6,7 +6,7 @@
 
 
 > [!WARNING]
-> - 宇宙级免责声明：最终效果完全取决于你最开始的论文好坏以及你使用的降重软件，本项目只是帮助你节省一些手动的时间，当然你也完全可以当老资历去手搓。
+> - 宇宙级免责声明：最终效果完全取决于你最开始的论文好坏以及你使用的降重软件，本项目只是帮助你节省一些手动的时间和多余资金，当然你也完全可以当老资历去手搓。
 > - 目前仅支持Mac/Linux平台，Windows我没试过
 > - 你所有需要降重的内容都需要被包含在main.tex，如果你有分小节的书写LaTeX习惯，恭喜你你用不了（doge
 > - 希望能帮到大家，祝你们都能顺利过检！Let's goooooo~
@@ -18,7 +18,7 @@
 ```bash
 # 1. 创建 job 并放入文件
 python3 aigcpass.py init --jobid mypaper
-#    → 把 main.tex 和 HTML 报告放到 jobs/mypaper/ 下
+#    → 把 main.tex 放到 jobs/mypaper/ 下，把HTML 报告放到jobs/mypaper/report/ 下
 
 # 2. Stage 1：提取标记（在 Claude Code 中说，或在终端运行）
 python3 aigcpass.py stage1 --jobid mypaper
@@ -136,7 +136,7 @@ python3 aigcpass.py stage1 --jobid mypaper
 
 4. 提取标记之间的完整 LaTeX 源码，清洗为纯文本：
    - 浮动环境（图/表）→ `<类型: label_key>`，使用 `\label{key}` 而非 `\caption{text}`
-   - `\ref{type:key}` → 根据 HTML 渲染文本反查为可读数字
+   - `\ref{key}` → 模拟 LaTeX 计数器解析为可读数字。脚本扫描 `main.tex` 中所有 `\label{...}` 和 `\section`/`\begin{figure}`/`\begin{table}` 等环境，按 LaTeX 编号规则（按节递进）为每个标签分配编号。`\ref{fig:mpk-overview}` → `1.2`，`\ref{tab:search-agg-results}` → `4.3`
    - `\cite{key}` → `[key]`
    - 公式 → `<公式>`
    - 其他 LaTeX 命令 → 删除，保留文本内容
@@ -189,17 +189,7 @@ python3 aigcpass.py stage2 --jobid mypaper --concurrency 3
 
 **流程**：
 
-```mermaid
-flowchart LR
-    A["原片段 LaTeX<br>紫色原文<br>优化文本"] --> B["LLM API<br>3 并发"]
-    B --> C{"4 项验证<br>段落? 引用?<br>环境? 内容变化?"}
-    C -->|通过| D["写入 CSV<br>标记 passed"]
-    C -->|失败| E{"重试次数 < 3 ?"}
-    E -->|是| F["附错误反馈<br>升温重试"]
-    F --> B
-    E -->|否| G["标记 failed<br>使用原片段"]
-    G --> D
-```
+![流程](./assets/流程.svg)
 
 1. **备份**：将带标记的 `main.tex` 备份到 `result/stage2/main.tex.bak`。如果备份已存在但内容与当前 `main.tex` 不同，终止并报错（防止覆盖干净备份）。
 

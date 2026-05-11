@@ -93,8 +93,79 @@ def is_blank(idx):
     if idx < 0 or idx >= len(tex_lines): return True
     return tex_lines[idx].strip() == ""
 
-# ═══ Step 3: clean_to_plain ═══
-def clean_to_plain(text, aigc_frag=""):
+# ═══ Step 3: LaTeX label → number mapping ═══
+def build_ref_map(tex):
+    """Simulate LaTeX counters to map each \\label{key} to its displayed number.
+
+    Returns dict: label_key → display_string (e.g. "图3.2", "表4.1", "2.3").
+    """
+    sec_num = 0           # current section number (unnumbered sections skipped)
+    fig_counter = 0       # per-section figure counter
+    tab_counter = 0       # per-section table counter
+
+    ref_map = {}
+
+    # Determine label type from key prefix.
+    # Note: LaTeX \ref{fig:xxx} produces just the number (e.g. "1.2"),
+    # the "图"/"表" prefix is already typed in the source text.
+    def label_type(key):
+        for pfx in ['fig:', 'tab:', 'eq:', 'alg:']:
+            if key.startswith(pfx):
+                return key[len(pfx):]
+        return key
+
+    # Scan tex line by line, tracking counters
+    lines = tex.split('\n')
+    in_figure = False
+    in_table = False
+    pending_labels = []  # labels collected inside current float
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Track section counters (skip starred/unnumbered)
+        if re.match(r'\\section\*?\{', stripped):
+            if not stripped.startswith(r'\section*'):
+                sec_num += 1
+                fig_counter = 0
+                tab_counter = 0
+
+        # Track float environments
+        if re.match(r'\\begin\{figure\}', stripped) or re.match(r'\\begin\{figure\*\}', stripped):
+            in_figure = True
+            pending_labels = []
+        if re.match(r'\\begin\{table\}', stripped) or re.match(r'\\begin\{table\*\}', stripped) or re.match(r'\\begin\{longtable\}', stripped):
+            in_table = True
+            pending_labels = []
+        if re.match(r'\\end\{figure\}', stripped) or re.match(r'\\end\{figure\*\}', stripped):
+            if in_figure:
+                fig_counter += 1
+                for lbl in pending_labels:
+                    ref_map[lbl] = f"{sec_num}.{fig_counter}"
+                pending_labels = []
+                in_figure = False
+        if re.match(r'\\end\{table\}', stripped) or re.match(r'\\end\{table\*\}', stripped) or re.match(r'\\end\{longtable\}', stripped):
+            if in_table:
+                tab_counter += 1
+                for lbl in pending_labels:
+                    ref_map[lbl] = f"{sec_num}.{tab_counter}"
+                pending_labels = []
+                in_table = False
+
+        # Collect labels outside floats
+        for m in re.finditer(r'\\label\{([^}]*)\}', stripped):
+            key = m.group(1)
+            if in_figure or in_table:
+                pending_labels.append(key)
+            else:
+                # Generic label (section, etc.) — just use section number
+                ref_map[key] = f"{sec_num}"
+
+    return ref_map
+
+
+# ═══ Step 4: clean_to_plain ═══
+def clean_to_plain(text, ref_map=None):
     def _label(block):
         m = re.search(r'\\label\{([^}]*)\}', block)
         if m:
@@ -121,26 +192,25 @@ def clean_to_plain(text, aigc_frag=""):
 
     def _list(m):
         items = re.findall(r'\\item\s*(.*?)(?=\\item|$)', m.group(0), re.DOTALL)
-        return "; ".join(clean_to_plain(it.strip()) for it in items if it.strip())
+        return "; ".join(clean_to_plain(it.strip(), ref_map) for it in items if it.strip())
     text = re.sub(r'\\begin\{enumerate\}.*?\\end\{enumerate\}', _list, text, flags=re.DOTALL)
     text = re.sub(r'\\begin\{itemize\}.*?\\end\{itemize\}', _list, text, flags=re.DOTALL)
 
     def _resolve_ref(m):
-        ref_type, ref_key = m.group(1), m.group(2)
-        if aigc_frag:
-            before_ctx = text[:m.start()]
-            visible = re.sub(r'\s+', '', before_ctx)
-            if len(visible) >= 5:
-                aigc_ns = re.sub(r'\s+', '', aigc_frag)
-                pos = aigc_ns.find(visible[-15:])
-                if pos >= 0:
-                    after = aigc_ns[pos + len(visible[-15:]):pos + len(visible[-15:]) + 10]
-                    nm = re.match(r'(\d+(?:[\.\-]\d+)*)', after)
-                    if nm: return nm.group(1)
-        return ref_key
+        full_key = m.group(0)[5:-1]  # extract entire key from \ref{...}
+        ref_type, ref_key = (m.group(1), m.group(2)) if len(m.groups()) >= 2 else (None, full_key)
+
+        if ref_map and full_key in ref_map:
+            return ref_map[full_key]
+
+        # Fallback: use label prefix to guess type
+        typ_map = {'fig': '图', 'tab': '表', 'eq': '公式', 'alg': '算法'}
+        if ref_type and ref_type in typ_map:
+            return f"{typ_map[ref_type]} {ref_key}"
+        return ref_key if ref_key else full_key
 
     text = re.sub(r'\\ref\{([a-z]+):([^}]*)\}', _resolve_ref, text)
-    text = re.sub(r'\\ref\{([^}]*)\}', lambda m: m.group(1), text)
+    text = re.sub(r'\\ref\{([^}]*)\}', _resolve_ref, text)
     text = re.sub(r'\\cite\{([^}]*)\}', r'[\1]', text)
     text = re.sub(r'\\label\{[^}]*\}', '', text)
     text = re.sub(r'\\includegraphics\*?(\[[^\]]*\])?\{[^}]*\}', '', text)
@@ -300,6 +370,7 @@ if manual_fallbacks > 0:
     print("  Edit the script's MANUAL_POSITIONS dict with verified (sl, sc, el, ec) values.")
 
 # ═══ Step 5: expand to paragraph boundaries, insert markers ═══
+ref_map = build_ref_map(tex)  # simulate LaTeX counters for \ref → readable number
 tex_bytes = list(tex)
 results = []
 
@@ -333,7 +404,7 @@ for i, pos in process_order:
 
     # Extract full paragraph
     para_tex = ''.join(tex_bytes[ps:pe]).strip()
-    paragraph_plain = clean_to_plain(para_tex, pt)
+    paragraph_plain = clean_to_plain(para_tex, ref_map)
 
     # Insert markers
     begin = f"% AIGC_BEGIN_{n}"
