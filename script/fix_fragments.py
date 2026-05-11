@@ -9,7 +9,14 @@ instead of replacing it. This script corrects each fragment by:
 """
 import csv, os, re, sys
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Find project root (scripts now live in .claude/skills/aigcpass/script/)
+import os as _os
+def _find_root():
+    d = _os.path.dirname(_os.path.abspath(__file__))
+    while d != "/" and not _os.path.exists(_os.path.join(d, ".git")):
+        d = _os.path.dirname(d)
+    return d if d != "/" else _os.getcwd()
+BASE = _find_root()
 CSV  = os.path.join(BASE, "jobs", "default", "result", "stage2", "疑似AIGC片段_待确认.csv")
 
 with open(CSV, encoding="utf-8-sig") as f:

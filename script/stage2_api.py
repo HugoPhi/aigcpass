@@ -15,7 +15,14 @@ from rich.live import Live
 from rich.progress import BarColumn, Progress, TextColumn
 from rich import box
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Find project root (scripts now live in .claude/skills/aigcpass/script/)
+import os as _os
+def _find_root():
+    d = _os.path.dirname(_os.path.abspath(__file__))
+    while d != "/" and not _os.path.exists(_os.path.join(d, ".git")):
+        d = _os.path.dirname(d)
+    return d if d != "/" else _os.getcwd()
+ROOT = _find_root()
 console = Console()
 
 # ─── config ──────────────────────────────────────────────────────────
@@ -243,13 +250,23 @@ def build_dashboard(jobs, concurrency, start_time):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jobid", default="default")
-    parser.add_argument("--config", default=os.path.join(ROOT, "config", "api.yaml"))
+    parser.add_argument("--config", default=None, help="api.yaml path (默认: jobs/{jobid}/api.yaml)")
     parser.add_argument("--concurrency", type=int, default=3)
     parser.add_argument("--start", type=int, default=1)
     parser.add_argument("--end", type=int, default=999)
     parser.add_argument("--no-dashboard", action="store_true")
     parser.add_argument("--dry-run", action="store_true", help="仅展示面板，不调用 API")
     args = parser.parse_args()
+
+    # Default config: per-job api.yaml
+    if args.config is None:
+        args.config = os.path.join(ROOT, "jobs", args.jobid, "api.yaml")
+    if not os.path.exists(args.config):
+        template = os.path.join(os.path.dirname(__file__), "..", "template", "api.yaml.example")
+        console.print(f"[red]ERROR:[/] {args.config} 不存在")
+        console.print(f"  请从模板创建: cp {template} {args.config}")
+        console.print(f"  然后编辑填入 API key")
+        sys.exit(1)
 
     cfg = load_config(args.config)
     JOB = os.path.join(ROOT, "jobs", args.jobid)
@@ -264,7 +281,7 @@ def main():
             sys.exit(1)
 
     # Read prompt template
-    PROMPT = os.path.join(ROOT, "prompt", "stage2_fitback.md")
+    PROMPT = os.path.join(os.path.dirname(__file__), "..", "prompt", "stage2_fitback.md")
     with open(PROMPT, encoding="utf-8") as f:
         template = f.read()
     system_prompt = template.split("## 原片段", 1)[0].strip()
@@ -426,11 +443,11 @@ def main():
     # ─── Run ─────────────────────────────────────────────────────────
     pending = [j for j in jobs if j.status == "pending"]
 
+    start_time = time.time()
     if args.no_dashboard:
         with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
             list(pool.map(adapt_one, pending))
     else:
-        start_time = time.time()
         with Live(build_dashboard(jobs, args.concurrency, start_time),
                   refresh_per_second=3, console=console) as live:
             with ThreadPoolExecutor(max_workers=args.concurrency) as pool:

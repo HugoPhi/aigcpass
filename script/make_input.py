@@ -10,7 +10,14 @@ parser.add_argument("--jobid", default="default")
 args = parser.parse_args()
 
 JOBID = args.jobid
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Find project root (scripts now live in .claude/skills/aigcpass/script/)
+import os as _os
+def _find_root():
+    d = _os.path.dirname(_os.path.abspath(__file__))
+    while d != "/" and not _os.path.exists(_os.path.join(d, ".git")):
+        d = _os.path.dirname(d)
+    return d if d != "/" else _os.getcwd()
+BASE = _find_root()
 JOB  = os.path.join(BASE, "jobs", JOBID)
 CSV  = os.path.join(JOB, "result", "stage1", "疑似AIGC片段.csv")
 INP_F = os.path.join(JOB, "result", "stage1", "input_fragments.txt")
