@@ -20,7 +20,7 @@ HTML 报告中的紫色标记可能跨段落渗入非 AIGC 文本。在插入标
 
 Stage 1 脚本已提取了紫色片段（存在 CSV 中）。你需要：
 
-1. 读取 `jobs/{jobid}/result/stage1/疑似AIGC片段.csv`
+1. 读取 `~/.claude/skills/aigcpass/jobs/{jobid}/result/stage1/疑似AIGC片段.csv`
 2. 对每个片段，读取其"标记ID"和"AIGC片段"列的文本
 3. 在 `main.tex` 中找到该片段对应的 LaTeX 源码位置
 
@@ -34,7 +34,7 @@ Stage 1 脚本已提取了紫色片段（存在 CSV 中）。你需要：
 
 ```bash
 # 用 grep 定位片段在 main.tex 中的大致位置
-grep -n "关键词" jobs/{jobid}/main.tex
+grep -n "关键词" ~/.claude/skills/aigcpass/jobs/{jobid}/main.tex
 ```
 
 如果紫色文本跨过了空行 → 该片段包含两个独立段落的内容。**标记为异常**，需要调整标记边界。

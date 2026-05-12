@@ -15,14 +15,7 @@ from rich.live import Live
 from rich.progress import BarColumn, Progress, TextColumn
 from rich import box
 
-# Find project root (scripts now live in .claude/skills/aigcpass/script/)
-import os as _os
-def _find_root():
-    d = _os.path.dirname(_os.path.abspath(__file__))
-    while d != "/" and not _os.path.exists(_os.path.join(d, ".git")):
-        d = _os.path.dirname(d)
-    return d if d != "/" else _os.getcwd()
-ROOT = _find_root()
+from _root import ROOT
 console = Console()
 
 # Import multi-provider API dispatcher

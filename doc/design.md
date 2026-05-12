@@ -223,11 +223,11 @@ coverage = Diff B / Diff A
 
 ## 6. 工程细节
 
-### 6.1 路径解析：`_find_root()`
+### 6.1 路径解析：`script/_root.py`
 
-项目从单一脚本演进为 Skill 后，文件层级关系发生了变化。早期使用固定层数的 `os.path.dirname()`，在 Skill 化后路径深度改变导致脚本找不到模板和 prompt。
+项目从单一脚本演进为 Skill 后，文件层级关系发生了变化。早期使用固定层数的 `os.path.dirname()`，在 Skill 化后路径深度改变导致脚本找不到模板和 prompt。后来改用向上查找 `.git` 目录的方式，但这在 skill 被直接复制（非 git clone）或嵌套在其他 git 仓库中时会产生错误定位。
 
-解决方案：`_find_root()` 从 `__file__` 出发向上遍历，直到找到 `.git` 目录。这比固定层数更鲁棒，无论脚本被放在 `script/`、`bin/` 还是其他子目录中都能正确找到项目根。
+解决方案：统一使用 `script/_root.py` 提供 `ROOT` 变量。它基于 `_root.py` 自身的文件位置直接计算 skill 根目录（`_root.py` 位于 `script/` 下，所以它的上级目录就是 skill 根）。所有脚本导入 `from _root import ROOT` 即可，无需重复实现路径查找逻辑。这完全不依赖 git 仓库结构，无论 skill 被安装到文件系统的哪个位置都能正确定位。
 
 ### 6.2 配置隔离：per-job `api.yaml`
 

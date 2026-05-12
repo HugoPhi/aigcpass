@@ -13,14 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--jobid", default="default")
 args = parser.parse_args()
 
-# Find project root (scripts now live in .claude/skills/aigcpass/script/)
-import os as _os
-def _find_root():
-    d = _os.path.dirname(_os.path.abspath(__file__))
-    while d != "/" and not _os.path.exists(_os.path.join(d, ".git")):
-        d = _os.path.dirname(d)
-    return d if d != "/" else _os.getcwd()
-BASE = _find_root()
+from _root import ROOT as BASE
 JOB  = os.path.join(BASE, "jobs", args.jobid)
 
 OPT = os.path.join(JOB, "report", "AIGC片段优化.txt")

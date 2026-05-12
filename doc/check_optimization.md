@@ -25,7 +25,7 @@
 | 十分复杂 | 较为复杂 / 极为复杂 |
 | 使用起来十分方便 | 使用方便 |
 
-**检查方法**：`grep -n '十分' jobs/{jobid}/report/AIGC片段优化.txt`
+**检查方法**：`grep -n '十分' ~/.claude/skills/aigcpass/jobs/{jobid}/report/AIGC片段优化.txt`
 
 ### 2. 堆叠的形容词/副词修饰
 
@@ -99,7 +99,7 @@
 ### Step 1: 读取优化文本
 
 ```bash
-cat jobs/{jobid}/report/AIGC片段优化.txt
+cat ~/.claude/skills/aigcpass/jobs/{jobid}/report/AIGC片段优化.txt
 ```
 
 ### Step 2: 逐段检查
@@ -107,10 +107,10 @@ cat jobs/{jobid}/report/AIGC片段优化.txt
 每段单独检查。用 `grep` 定位问题，然后人工读取上下文判断是否违规。
 
 ```bash
-grep -n '十分' jobs/{jobid}/report/AIGC片段优化.txt
-grep -n '吧' jobs/{jobid}/report/AIGC片段优化.txt
-grep -n '自然\|妥帖\|毋庸\|不言而喻\|众所周知' jobs/{jobid}/report/AIGC片段优化.txt
-grep -n '（.*）' jobs/{jobid}/report/AIGC片段优化.txt  # 手动检查每个括号
+grep -n '十分' ~/.claude/skills/aigcpass/jobs/{jobid}/report/AIGC片段优化.txt
+grep -n '吧' ~/.claude/skills/aigcpass/jobs/{jobid}/report/AIGC片段优化.txt
+grep -n '自然\|妥帖\|毋庸\|不言而喻\|众所周知' ~/.claude/skills/aigcpass/jobs/{jobid}/report/AIGC片段优化.txt
+grep -n '（.*）' ~/.claude/skills/aigcpass/jobs/{jobid}/report/AIGC片段优化.txt  # 手动检查每个括号
 ```
 
 ### Step 3: 生成审查报告

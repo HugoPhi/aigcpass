@@ -58,8 +58,8 @@ coverage = diff_b / max(diff_a, 0.01)
 ### Step 1: 快速验证（收集数据，不做判定）
 
 ```bash
-python3 script/xvalidate.py --jobid {jobid}      # 展示 diff 数据
-python3 script/diagnose_fragments.py              # 展示段落数匹配
+cd ~/.claude/skills/aigcpass && python3 script/xvalidate.py --jobid {jobid}      # 展示 diff 数据
+cd ~/.claude/skills/aigcpass && python3 script/diagnose_fragments.py              # 展示段落数匹配
 ```
 
 把输出当作**信息来源**，不盲从其 PASS/FAIL 结论。
@@ -73,7 +73,7 @@ python3 script/diagnose_fragments.py              # 展示段落数匹配
 3. **非紫色保留** — 节标题、首尾句等非降重内容是否未被修改
 
 ```bash
-python3 aigcpass.py diff --csv jobs/{jobid}/result/stage2/疑似AIGC片段_待确认.csv -t 原片段 修改后片段
+cd ~/.claude/skills/aigcpass && python3 aigcpass.py diff --csv jobs/{jobid}/result/stage2/疑似AIGC片段_待确认.csv -t 原片段 修改后片段
 ```
 
 ### Step 3: 计算交集覆盖率
@@ -94,9 +94,9 @@ Stage 2 审查报告
   [ID] 覆盖率=XX% — 你的判断：接受 / 建议重跑
 
 建议操作:
-  1. 失败片段: python3 -u script/stage2_api.py --jobid {jobid} --start ID --end ID
+  1. 失败片段: cd ~/.claude/skills/aigcpass && python3 -u script/stage2_api.py --jobid {jobid} --start ID --end ID
   2. 弱适配: 用户判断是否接受
-  3. 全部通过后: python3 script/apply_stage2.py --jobid {jobid}
+  3. 全部通过后: cd ~/.claude/skills/aigcpass && python3 script/apply_stage2.py --jobid {jobid}
 ```
 
 ### Step 5: 报告用户并等待确认

@@ -1,7 +1,6 @@
 # 脚本参考
 
-所有脚本位于 `script/`，通过 `python3 script/<name>.py` 调用。
-均支持 `--jobid` 参数（默认 `default`）。
+所有脚本位于 `script/`。以下命令示例假设 skill 安装在 `~/.claude/skills/aigcpass/`，请先 `cd` 到对应目录再执行。均支持 `--jobid` 参数（默认 `default`）。
 
 ---
 
@@ -18,7 +17,7 @@
 
 **示例**：
 ```bash
-python3 script/extract_aigc.py --jobid mypaper
+cd ~/.claude/skills/aigcpass && python3 script/extract_aigc.py --jobid mypaper
 ```
 
 **产物**（输出到 `jobs/{jobid}/result/stage1/`）：
@@ -50,13 +49,13 @@ python3 script/extract_aigc.py --jobid mypaper
 **示例**：
 ```bash
 # 完整运行（实时面板）
-python3 -u script/stage2_api.py --jobid mypaper --concurrency 3
+cd ~/.claude/skills/aigcpass && python3 -u script/stage2_api.py --jobid mypaper --concurrency 3
 
 # 纯文本模式
-python3 -u script/stage2_api.py --jobid mypaper --no-dashboard
+cd ~/.claude/skills/aigcpass && python3 -u script/stage2_api.py --jobid mypaper --no-dashboard
 
 # 仅重新处理片段 8-12
-python3 -u script/stage2_api.py --jobid mypaper --start 8 --end 12
+cd ~/.claude/skills/aigcpass && python3 -u script/stage2_api.py --jobid mypaper --start 8 --end 12
 ```
 
 **产物**：
@@ -75,7 +74,7 @@ python3 -u script/stage2_api.py --jobid mypaper --start 8 --end 12
 
 **示例**：
 ```bash
-python3 script/apply_stage2.py --jobid mypaper
+cd ~/.claude/skills/aigcpass && python3 script/apply_stage2.py --jobid mypaper
 ```
 
 ---
@@ -90,7 +89,7 @@ python3 script/apply_stage2.py --jobid mypaper
 
 **示例**：
 ```bash
-python3 script/xvalidate.py --jobid mypaper
+cd ~/.claude/skills/aigcpass && python3 script/xvalidate.py --jobid mypaper
 ```
 
 **输出**：每个片段的 Diff A、Diff B、状态（OK/FAIL/SKIP）。
@@ -105,7 +104,7 @@ python3 script/xvalidate.py --jobid mypaper
 
 **示例**：
 ```bash
-python3 script/diagnose_fragments.py
+cd ~/.claude/skills/aigcpass && python3 script/diagnose_fragments.py
 ```
 
 ---
@@ -120,7 +119,7 @@ python3 script/diagnose_fragments.py
 
 **示例**：
 ```bash
-python3 script/make_input.py --jobid mypaper
+cd ~/.claude/skills/aigcpass && python3 script/make_input.py --jobid mypaper
 ```
 
 ---
